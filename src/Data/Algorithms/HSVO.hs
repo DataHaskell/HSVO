@@ -10,15 +10,14 @@ import qualified Data.Vector as V
 import Data.Array.Repa.Repr.Vector                   as RV
 import Data.Array.Repa.Algorithms.Matrix
 
-
 type Value = Double
 
 type BaseVector = Array U DIM1 Value
 type BaseScalar = Array U Z Value
 
 -- Making these types to attempt to make the system more type-safe
-data Sample = Sample BaseVector deriving (Show)
-data Weights = Weights BaseVector deriving (Show)
+newtype Sample = Sample BaseVector deriving (Show)
+newtype Weights = Weights BaseVector deriving (Show)
 
 weightAsSample :: Weights -> Sample
 weightAsSample (Weights w) = Sample w
@@ -101,7 +100,7 @@ svm params svl x =
               in
                 chooseClass $ res ! Z
 
--- equation 15, 2nd Derivative
+-- |equation 15, 2nd Derivative
 calcGrad :: Kernel -> Sample -> Sample -> BaseScalar
 calcGrad k x1 x2 =  computeS $ (x1 `k` x1) +^ (x2 `k` x2) -^ (wrapScalar 2 *^ (x1 `k` x2) )
 
