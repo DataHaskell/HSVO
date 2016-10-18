@@ -1,5 +1,7 @@
 {- LANGUAGE XTypeOperators -}
 {-# LANGUAGE TemplateHaskell #-}
+
+module Data.Algorithms.HSVO where
 import Control.Lens
 import  Data.Array.Repa
 import qualified Data.Array.Repa as R
@@ -302,27 +304,7 @@ takeStep params tData i j =
             -- Next evaluate SVM using the new results for a1 and a2
             -- Looks like I will need a complete SVM copy, and to make a
             -- new training set... can I build a traverse?
-            return (finalSv1, finalSv2)vector2
-      -> BaseScalar
-f2 params sv1 sv2 =
-    let
-        k = params^.kernel
-        b = params^.threshold
-        a1 = sv1^.supvec.alpha
-        a2 = sv2^.supvec.alpha
-        y1 = sv1^.trueLabel
-        y1'= wrapScalar $ classToDbl y1
-        y2 = sv2^.trueLabel
-        y2'= wrapScalar $ classToDbl y2
-        x1 = sv1^.supvec.vector
-        x2 = sv2^.supvec.vector
-        s   = wrapScalar $ calcS y1 y2
-        k22 = x2 `k` x2
-        k12 = x1 `k` x2
-        e2 = wrapScalar $ calcClassError (sv2^.trueLabel) (sv2^.predLabel)
-    in
-        computeS $ y2'*^(e2 +^ b) -^ s *^ a1 *^ k12 -^ a2 *^ k22
-
+            return (finalSv1, finalSv2)
 
 -- equation 13
 lowerAlpha :: SVMParameters
@@ -622,3 +604,12 @@ takeStep params tData i j =
             -- Looks like I will need a complete SVM copy, and to make a
             -- new training set... can I build a traverse?
             return (finalSv1, finalSv2)
+
+examineExample :: SVMParameters
+                  -> V.Vector TrainingSupportVector
+                  -> Int                          -- ^ Index into trainData for i
+                  --- Consider another data structure for this, as we need to lots of insertions and deletions... actually, maybe linked list isn't too bad...
+                  -> [Int]                        -- ^ List of all non-zerod or non-maxed indexes into trainData
+                  -> Maybe (V.Vector TrainingSupportVector)
+examineExample params tData i =
+  undefinied
