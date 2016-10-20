@@ -15,19 +15,14 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Data.Algorithms.HSVO
-  build-depends:       base >= 4.7 && < 5
-                       ,repa-algorithms >= 3.4.0
-                       ,lens >= 4.13
+  exposed-modules:     Numeric.Algorithms.HSVO
+  build-depends:       base >= 4.7 && < 5,
+                       repa >= 3.4.0,
+                       vector >= 0.11,
+                       repa-algorithms >= 3.4.0,
+                       lens >= 4.13
   default-language:    Haskell2010
 
-executable HSVO-exe
-  hs-source-dirs:      app
-  main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                       
-  default-language:    Haskell2010
 
 test-suite HSVO-test
   type:                exitcode-stdio-1.0

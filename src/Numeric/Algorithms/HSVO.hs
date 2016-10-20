@@ -1,7 +1,7 @@
 {- LANGUAGE XTypeOperators -}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Data.Algorithms.HSVO where
+module Numeric.Algorithms.HSVO where
 import Control.Lens
 import  Data.Array.Repa
 import qualified Data.Array.Repa as R
@@ -205,6 +205,27 @@ f1 params sv1 sv2 =
 f2 :: SVMParameters --
       -> TrainingSupportVector -- ^ Vector1
       -> TrainingSupportVector -- ^ -- modify existing training vector
+      -> BaseScalar
+f2 params sv1 sv2 =
+    let
+        k = params^.kernel
+        b = params^.threshold
+        a1 = sv1^.supvec.alpha
+        a2 = sv2^.supvec.alpha
+        y1 = sv1^.trueLabel
+        y1'= wrapScalar $ classToDbl y1
+        y2 = sv2^.trueLabel
+        y2'= wrapScalar $ classToDbl y2
+        x1 = sv1^.supvec.vector
+        x2 = sv2^.supvec.vector
+        s   = wrapScalar $ calcS y1 y2
+        k22 = x2 `k` x2
+        k12 = x1 `k` x2
+        e2 = wrapScalar $ calcClassError (sv2^.trueLabel) (sv2^.predLabel)
+    in
+        computeS $ y2'*^(e2 +^ b) -^ s *^ a1 *^ k12 -^ a2 *^ k22
+
+
 constructTrainingVec :: TrainingSupportVector
                         -> PredictedLabel
                         -> SupportVector
@@ -255,56 +276,6 @@ takeStep params tData i j =
             -- Looks like I will need a complete SVM copy, and to make a
             -- new training set... can I build a traverse?
             return (finalSv1, finalSv2)-- modify existing training vector
-constructTrainingVec :: TrainingSupportVector
-                        -> PredictedLabel
-                        -> SupportVector
-                        -> TrainingSupportVector
-constructTrainingVec tsv label sv =
-    let
-        trueL = tsv^.trueLabel
-        err = calcClassError trueL label
-    in
-        TrainingSV
-            {
-              _trueLabel = trueL
-            , _predLabel = label
-            , _supvec = sv
-            , _classError = err
-            }
-
-
--- | Assume that training support vector aren't equal.
-takeStep :: SVMParameters
-            -> V.Vector TrainingSupportVector
-            -> Int  -- Index into trainData for i
-            -> Int  -- Index into trainData for j
-            -> Maybe (TrainingSupportVector, TrainingSupportVector)
-takeStep params tData i j =
-    let
-        sv1 = tData V.! ( i)
-        sv2 = tData V.! ( j)
-        x1 = sv1^.supvec.vector
-        x2 = sv2^.supvec.vector
-        diff = sumVector (elementDifference x1 x2)
-        identical = abs (diff) < params^.epsillon
-        sVectors = V.map (\a-> a^.supvec) tData
-    in
-        do
-            -- First step, check that the vectors are identical.
-            _ <- pure (if identical then Nothing else Just ())
-            (a2, a2clip) <- determineAlpha2 params sv1 sv2
-            a1 <- pure $ alpha1New sv1 sv2 (wrapScalar a2) (wrapScalar a2clip)
-            sv1' <- pure $ SupportVector {_alpha= a1, _vector=sv1^.supvec.vector}
-            sv2' <- pure $ SupportVector {_alpha=wrapScalar (a2), _vector=sv2^.supvec.vector}
-            newSvec <- pure $ V.toList $ sVectors V.// [(i, sv1'), (j, sv2')]
-            pred1 <- pure $ svm params newSvec x1
-            pred2 <- pure $ svm params newSvec x2
-            finalSv1 <- pure $ constructTrainingVec sv1 pred1 sv1'
-            finalSv2 <- pure $ constructTrainingVec sv2 pred2 sv2'
-            -- Next evaluate SVM using the new results for a1 and a2
-            -- Looks like I will need a complete SVM copy, and to make a
-            -- new training set... can I build a traverse?
-            return (finalSv1, finalSv2)
 
 -- equation 13
 lowerAlpha :: SVMParameters
@@ -552,64 +523,12 @@ determineAlpha2 params sv1 sv2 =
 trainToSv :: V.Vector TrainingSupportVector -> V.Vector Sample
 trainToSv = V.map (\a -> a^.supvec.vector )
 
-
--- | modify existing training vector
-constructTrainingVec :: TrainingSupportVector
-                        -> PredictedLabel
-                        -> SupportVector
-                        -> TrainingSupportVector
-constructTrainingVec tsv label sv =
-    let
-        trueL = tsv^.trueLabel
-        err = calcClassError trueL label
-    in
-        TrainingSV
-            {
-              _trueLabel = trueL
-            , _predLabel = label
-            , _supvec = sv
-            , _classError = err
-            }
-
-
--- Assume that training support vector aren't equal.
-takeStep :: SVMParameters
-            -> V.Vector TrainingSupportVector
-            -> Int  -- ^Index into trainData for i
-            -> Int  -- ^Index into trainData for j
-            -> Maybe (TrainingSupportVector, TrainingSupportVector)
-takeStep params tData i j =
-    let
-        sv1 = tData V.! ( i)
-        sv2 = tData V.! ( j)
-        x1 = sv1^.supvec.vector
-        x2 = sv2^.supvec.vector
-        diff = sumVector (elementDifference x1 x2)
-        identical = abs (diff) < params^.epsillon
-        sVectors = V.map (\a-> a^.supvec) tData
-    in
-        do
-            -- First step, check that the vectors are identical.
-            _ <- pure (if identical then Nothing else Just ())
-            (a2, a2clip) <- determineAlpha2 params sv1 sv2
-            a1 <- pure $ alpha1New sv1 sv2 (wrapScalar a2) (wrapScalar a2clip)
-            sv1' <- pure $ SupportVector {_alpha= a1, _vector=sv1^.supvec.vector}
-            sv2' <- pure $ SupportVector {_alpha=wrapScalar (a2), _vector=sv2^.supvec.vector}
-            newSvec <- pure $ V.toList $ sVectors V.// [(i, sv1'), (j, sv2')]
-            pred1 <- pure $ svm params newSvec x1
-            pred2 <- pure $ svm params newSvec x2
-            finalSv1 <- pure $ constructTrainingVec sv1 pred1 sv1'
-            finalSv2 <- pure $ constructTrainingVec sv2 pred2 sv2'
-            -- Next evaluate SVM using the new results for a1 and a2
-            -- Looks like I will need a complete SVM copy, and to make a
-            -- new training set... can I build a traverse?
-            return (finalSv1, finalSv2)
-
+{-
 examineExample :: SVMParameters
                   -> V.Vector TrainingSupportVector
                   -> Int                          -- ^ Index into trainData for i
                   --- Consider another data structure for this, as we need to lots of insertions and deletions... actually, maybe linked list isn't too bad...
                   -> [Int]                        -- ^ List of all non-zerod or non-maxed indexes into trainData
                   -> Maybe (V.Vector TrainingSupportVector)
-examineExample params tData i =
-  undefinied
+examineExample params tData i = undefined
+-}
