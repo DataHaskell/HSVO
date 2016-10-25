@@ -36,7 +36,6 @@ data ClassLabel = Class1 | Class2 deriving (Show, Eq)
 data PredictedLabel = PredictClass1 Value | PredictClass2 Value deriving (Show, Eq)
 
 
-
 data SupportVector = SupportVector {
                          _alpha :: BaseScalar
                        , _vector :: Sample
@@ -95,7 +94,7 @@ evaluateKernelWithWeight k sv x = computeS $ (sv^.alpha) *^ (sv^.vector) `k` x
 
 svm :: SVMParameters -> [SupportVector] -> Sample -> PredictedLabel
 svm params svl x =
-              let
+             let
                 k = params^.kernel
                 b = params^.threshold
                 res = foldl (\a sv -> computeS (a +^ evaluateKernelWithWeight k sv x) ) (wrapScalar 0) svl -^ b
@@ -523,12 +522,48 @@ determineAlpha2 params sv1 sv2 =
 trainToSv :: V.Vector TrainingSupportVector -> V.Vector Sample
 trainToSv = V.map (\a -> a^.supvec.vector )
 
-{-
-examineExample :: SVMParameters
+
+-- | Second choice heuristic will choose to maximise the expected change in error
+--   from optimising this step. See paper for more details.
+secondChoiceHeuristic :: V.Vector TrainingSupportVector -> [Int] -> TrainingSupportVector -> Int
+secondChoiceHeuristic tData boundList target =
+  let
+    errors = map (\a -> (tData ! a) ^.classError) boundList
+    errorAndIndex = zip errors boundList
+    targetErr = target ^. classError
+    findMax (best, i1) (er2, i2) = if v > best then (v, i2) else (best, i1)
+                                        where v = abs (targetErr - er2)
+  in
+    sn2 $ foldl findMax (0, 1) boundList 
+
+
+examineExample :: RandomGen => SVMParameters
                   -> V.Vector TrainingSupportVector
                   -> Int                          -- ^ Index into trainData for i
                   --- Consider another data structure for this, as we need to lots of insertions and deletions... actually, maybe linked list isn't too bad...
                   -> [Int]                        -- ^ List of all non-zerod or non-maxed indexes into trainData
-                  -> Maybe (V.Vector TrainingSupportVector)
-examineExample params tData i = undefined
--}
+                  -> g   -- random number Generator
+                  -> (Maybe (V.Vector TrainingSupportVector), g)
+examineExample params tData i boundList =
+  let
+    sv = tData ! i
+    y2 = sv ^.trueLabel
+    alph2 = sv ^. supvec ^. alpha
+    t2 = sv ^. predLabel
+    e2 = calcClassError y2 t2
+    r2 = e2 * (classToDbl y2)
+    margin = params ^. margin
+    scdHeur = secondChoiceHeuristic tData boundList i
+    firstRandomStart = next g
+    secondRandomStart = next g
+  in do
+    _ <- if (r2 < -tol && alph2 < c) || (r2 > tol && alph2 > 0) then Just () else Nothing
+    scnChoice = if (length tData) > 1) then takeStep(i1,i2) else Nothing
+
+    
+
+    -- So to solve this, create a list of maybe results, one for each of the cases.
+    -- Then we concat all the lits of maybes together and use msum from MonadPlus.
+    -- This will return just the first non-nothing value, or if none was found, it
+    -- itself will return Nothing. Hopefully due to lazy evaluation it will only
+    -- actually eval up untill the first Non-Nothing in the list!
