@@ -1,7 +1,7 @@
 {- LANGUAGE XTypeOperators -}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Numeric.Algorithms.HSVO where
+module Numeric.Algorithms.HSVO.Detail where
 import Control.Lens
 import  Data.Array.Repa
 import qualified Data.Array.Repa as R
@@ -243,38 +243,6 @@ constructTrainingVec tsv label sv =
             }
 
 
--- | Assume that training support vector aren't equal.
-takeStep :: SVMParameters
-            -> V.Vector TrainingSupportVector
-            -> Int  -- ^ Index into trainData for i
-            -> Int  -- ^ Index into trainData for j
-            -> Maybe (TrainingSupportVector, TrainingSupportVector)
-takeStep params tData i j =
-    let
-        sv1 = tData V.! ( i)
-        sv2 = tData V.! ( j)
-        x1 = sv1^.supvec.vector
-        x2 = sv2^.supvec.vector
-        diff = sumVector (elementDifference x1 x2)
-        identical = abs (diff) < params^.epsillon
-        sVectors = V.map (\a-> a^.supvec) tData
-    in
-        do
-            -- First step, check that the vectors are identical.
-            _ <- pure (if identical then Nothing else Just ())
-            (a2, a2clip) <- determineAlpha2 params sv1 sv2
-            a1 <- pure $ alpha1New sv1 sv2 (wrapScalar a2) (wrapScalar a2clip)
-            sv1' <- pure $ SupportVector {_alpha= a1, _vector=sv1^.supvec.vector}
-            sv2' <- pure $ SupportVector {_alpha=wrapScalar (a2), _vector=sv2^.supvec.vector}
-            newSvec <- pure $ V.toList $ sVectors V.// [(i, sv1'), (j, sv2')]
-            pred1 <- pure $ svm params newSvec x1
-            pred2 <- pure $ svm params newSvec x2
-            finalSv1 <- pure $ constructTrainingVec sv1 pred1 sv1'
-            finalSv2 <- pure $ constructTrainingVec sv2 pred2 sv2'
-            -- Next evaluate SVM using the new results for a1 and a2
-            -- Looks like I will need a complete SVM copy, and to make a
-            -- new training set... can I build a traverse?
-            return (finalSv1, finalSv2)-- modify existing training vector
 
 -- equation 13
 lowerAlpha :: SVMParameters
@@ -518,52 +486,3 @@ determineAlpha2 params sv1 sv2 =
        _ <- if (abs(a2-alpha2) < eps*(a2+alpha2+eps)) then Nothing else Just ()
        Just (a2, a2clip)
 
-
-trainToSv :: V.Vector TrainingSupportVector -> V.Vector Sample
-trainToSv = V.map (\a -> a^.supvec.vector )
-
-
--- | Second choice heuristic will choose to maximise the expected change in error
---   from optimising this step. See paper for more details.
-secondChoiceHeuristic :: V.Vector TrainingSupportVector -> [Int] -> TrainingSupportVector -> Int
-secondChoiceHeuristic tData boundList target =
-  let
-    errors = map (\a -> (tData ! a) ^.classError) boundList
-    errorAndIndex = zip errors boundList
-    targetErr = target ^. classError
-    findMax (best, i1) (er2, i2) = if v > best then (v, i2) else (best, i1)
-                                        where v = abs (targetErr - er2)
-  in
-    sn2 $ foldl findMax (0, 1) boundList 
-
-
-examineExample :: RandomGen => SVMParameters
-                  -> V.Vector TrainingSupportVector
-                  -> Int                          -- ^ Index into trainData for i
-                  --- Consider another data structure for this, as we need to lots of insertions and deletions... actually, maybe linked list isn't too bad...
-                  -> [Int]                        -- ^ List of all non-zerod or non-maxed indexes into trainData
-                  -> g   -- random number Generator
-                  -> (Maybe (V.Vector TrainingSupportVector), g)
-examineExample params tData i boundList =
-  let
-    sv = tData ! i
-    y2 = sv ^.trueLabel
-    alph2 = sv ^. supvec ^. alpha
-    t2 = sv ^. predLabel
-    e2 = calcClassError y2 t2
-    r2 = e2 * (classToDbl y2)
-    margin = params ^. margin
-    scdHeur = secondChoiceHeuristic tData boundList i
-    firstRandomStart = next g
-    secondRandomStart = next g
-  in do
-    _ <- if (r2 < -tol && alph2 < c) || (r2 > tol && alph2 > 0) then Just () else Nothing
-    scnChoice = if (length tData) > 1) then takeStep(i1,i2) else Nothing
-
-    
-
-    -- So to solve this, create a list of maybe results, one for each of the cases.
-    -- Then we concat all the lits of maybes together and use msum from MonadPlus.
-    -- This will return just the first non-nothing value, or if none was found, it
-    -- itself will return Nothing. Hopefully due to lazy evaluation it will only
-    -- actually eval up untill the first Non-Nothing in the list!

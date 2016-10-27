@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Numeric.Algorithms.HSVO
+  exposed-modules:     Numeric.Algorithms.HSVO.Detail
   build-depends:       base >= 4.7 && < 5,
                        repa >= 3.4.0,
                        vector >= 0.11,
