@@ -6,6 +6,7 @@ import Control.Lens
 import  Data.Array.Repa
 import qualified Data.Array.Repa as R
 
+
 import Data.Array.Repa.Repr.Vector
 import qualified Data.Vector as V
 
