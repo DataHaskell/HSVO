@@ -49,15 +49,21 @@ takeStepBlah =
     return ()
 
 
+{-
+It appears that I might need to reconsider the design again...
+I want some state inside the takestep loop so I can know what the change is... well, I guess I can try and pull that out....
+
+Hmm... I guess I need to be careful with this design...
+
+-}
 
 
-
-takeStep :: SVMProblem (TrainingSupportVector -> TrainingSupportVector )
+takeStep :: SVMProblem ( TrainingSupportVector -> Maybe TrainingSupportVector )
 takeStep =
   do
     vecs <- get
     params <- ask
-    pure $  \x -> collateMaybes x [takeStepDetail params vec x  | vec <-  (_vectorList vecs ) ] -- list comprehension to evaluate over all maybes...
+    pure $ \x -> collateMaybes x [takeStepDetail params vec x  | vec <-  (_vectorList vecs ) ] -- list comprehension to evaluate over all maybes...
 
 helper1 :: Maybe a -> [a] -> [a]
 helper1 (Just a) b = a : b
@@ -70,7 +76,7 @@ maybeToLists  =
 
 
 
-collateMaybes :: TrainingSupportVector -> [Maybe (TrainingSupportVector, TrainingSupportVector)] -> TrainingSupportVector
+collateMaybes :: TrainingSupportVector -> [Maybe (TrainingSupportVector, TrainingSupportVector)] -> Maybe TrainingSupportVector
 collateMaybes tsv1 tsvList =
   let
      validResults = WorkingState {_vectorList = snd <$> maybeToLists tsvList}
@@ -79,12 +85,12 @@ collateMaybes tsv1 tsvList =
      len =  snd alpha_data
      mean = sum / len
      tsv = firstOf (vectorList.traversed) validResults :: Maybe TrainingSupportVector
-     newTsv = (\t -> set (supvec . alpha) (wrapScalar mean) t) <$> tsv
+     makeNewTSV  = set (supvec . alpha) (wrapScalar mean) :: TrainingSupportVector -> TrainingSupportVector
      -- now extract the first element of validResults and modify it so that it has an alpha that is the mean value.
      -- now compute the new error for the global training example given that.
 
   in
-    undefined
+    makeNewTSV <$> tsv
    -- We need to use the foldMaybe thing, where it returns two sets of lits
 
 {-
