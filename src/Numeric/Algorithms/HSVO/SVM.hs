@@ -14,6 +14,7 @@ import Control.Monad.Reader --(MonadReader, Reader, ReaderT)
 import Control.Monad.State --(MonadState, State, StateT)
 import Control.Monad.Writer
 
+import Control.Foldl
 
 -- We need to be able to pass both the global parameters, but also some state parameters
 -- in the form of the vectors ....
