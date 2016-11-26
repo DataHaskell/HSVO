@@ -81,7 +81,7 @@ predictToTrue (PredictClass1 _) = Class1
 predictToTrue (PredictClass2 _) = Class2
 
 wrapScalar :: Value -> BaseScalar
-wrapScalar s = fromListUnboxed R.Z ([s] :: [Value])
+wrapScalar s = fromListUnboxed R.Z ([s])
 
 -- Building an SVM
 
