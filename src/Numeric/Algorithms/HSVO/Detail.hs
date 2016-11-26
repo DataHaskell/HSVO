@@ -1,11 +1,12 @@
 {- LANGUAGE XTypeOperators -}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Numeric.Algorithms.HSVO.Detail where
 import Control.Lens
 import  Data.Array.Repa (U, DIM1, computeS, computeP, foldS, foldP, foldAllS, fromListUnboxed, (-^), (*^), (+^), (!), (/^))
 import qualified Data.Array.Repa as R
-
+import Generics.Deriving
 
 --import Data.Array.Repa.Repr.Vector
 import qualified Data.Vector as V
@@ -40,23 +41,24 @@ data PredictedLabel = PredictClass1 Value | PredictClass2 Value deriving (Show, 
 data SupportVector = SupportVector {
                          _alpha :: BaseScalar
                        , _vector :: Sample
-                       } deriving (Show)
+                       } deriving (Show, Generic)
 
 data TrainingSupportVector = TrainingSV {
                              _trueLabel :: ClassLabel
                            , _predLabel :: PredictedLabel
                            , _classError :: Value
                            , _supvec :: SupportVector
-                        } deriving (Show)
+                        } deriving (Show, Generic)
 
 data SVMParameters = SVMParameters {
                         _kernel :: Kernel
                      ,  _threshold :: Threshold
                      ,  _margin :: BaseScalar     -- ^ parameter C in eq. 9
                      ,  _epsillon :: Value        -- ^ rounding error for equality
-                    }
+                    } deriving (Generic)
 
 data TrainingData = TrainingData {_training :: V.Vector TrainingSupportVector}
+                     deriving ( Generic)
 
 makeLenses ''SupportVector
 makeLenses ''TrainingSupportVector
