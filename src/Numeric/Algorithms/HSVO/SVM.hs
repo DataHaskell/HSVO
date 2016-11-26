@@ -80,7 +80,7 @@ collateMaybes :: TrainingSupportVector -> [Maybe (TrainingSupportVector, Trainin
 collateMaybes tsv1 tsvList =
   let
      validResults = WorkingState {_vectorList = snd <$> maybeToLists tsvList}
-     alpha_data = foldrOf (vectorList . traverse . supvec . alpha) (\a (sum, count) -> ( (scalarToDbl a) + sum, count+1)) (0, 0) validResults
+     alpha_data = foldrOf (vectorList . traverse . supvec . alpha) (\a (sum, count) -> ( (scalarToValue a) + sum, count+1)) (0, 0) validResults
      sum =  fst alpha_data
      len =  snd alpha_data
      mean = sum / len

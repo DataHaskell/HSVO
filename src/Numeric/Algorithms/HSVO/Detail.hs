@@ -158,8 +158,8 @@ alphaNewClipped a h l
     | otherwise = a
 
 
-scalarToDbl :: BaseScalar -> Value
-scalarToDbl s = s ! ( R.Z )
+scalarToValue :: BaseScalar -> Value
+scalarToValue s = s ! ( R.Z )
 
 calcS :: ClassLabel -> ClassLabel -> Value
 calcS y1 y2 =
@@ -256,9 +256,9 @@ lowerAlpha params sv1 sv2 =
     let
         y1 = sv1^.trueLabel
         y2 = sv2^.trueLabel
-        a1 = scalarToDbl $ sv1^.supvec.alpha
-        a2 = scalarToDbl $ sv2^.supvec.alpha
-        c = scalarToDbl $ params^.margin
+        a1 = scalarToValue $ sv1^.supvec.alpha
+        a2 = scalarToValue $ sv2^.supvec.alpha
+        c = scalarToValue $ params^.margin
     in
         if not(y1 == y2)
         then
@@ -276,9 +276,9 @@ upperAlpha params sv1 sv2 =
     let
         y1 = sv1^.trueLabel
         y2 = sv2^.trueLabel
-        a1 = scalarToDbl $ sv1^.supvec.alpha
-        a2 = scalarToDbl $ sv2^.supvec.alpha
-        c = scalarToDbl $ params^.margin
+        a1 = scalarToValue $ sv1^.supvec.alpha
+        a2 = scalarToValue $ sv2^.supvec.alpha
+        c = scalarToValue $ params^.margin
     in
         if not (y1 == y2)
         then
@@ -295,9 +295,9 @@ l1 params sv1 sv2 =
     let
         y1 = sv1^.trueLabel
         y2 = sv2^.trueLabel
-        a1 = scalarToDbl $ sv1^.supvec.alpha
-        a2 = scalarToDbl $ sv2^.supvec.alpha
-        c = scalarToDbl $ params^.margin
+        a1 = scalarToValue $ sv1^.supvec.alpha
+        a2 = scalarToValue $ sv2^.supvec.alpha
+        c = scalarToValue $ params^.margin
         l = lowerAlpha params sv1 sv2
         s = calcS y1 y2
     in
@@ -311,9 +311,9 @@ h1 params sv1 sv2 =
     let
         y1 = sv1^.trueLabel
         y2 = sv2^.trueLabel
-        a1 = scalarToDbl $ sv1^.supvec.alpha
-        a2 = scalarToDbl $ sv2^.supvec.alpha
-        c = scalarToDbl $ params^.margin
+        a1 = scalarToValue $ sv1^.supvec.alpha
+        a2 = scalarToValue $ sv2^.supvec.alpha
+        c = scalarToValue $ params^.margin
         h = upperAlpha params sv1 sv2
         s = calcS y1 y2
     in
@@ -403,7 +403,7 @@ computeB :: SVMParameters
 computeB params a1new a2new sv1 sv2 =
     let
         eps = params^.epsillon
-        c = scalarToDbl $ params^.margin
+        c = scalarToValue $ params^.margin
         k = params^.kernel
         b = params^.threshold
         y1 = sv1^.trueLabel
@@ -412,17 +412,17 @@ computeB params a1new a2new sv1 sv2 =
         t2 = sv2^.predLabel
         x1 = sv1^.supvec.vector
         x2 = sv2^.supvec.vector
-        a1 = scalarToDbl (sv1^.supvec.alpha)
-        a2 = scalarToDbl (sv2^.supvec.alpha)
+        a1 = scalarToValue (sv1^.supvec.alpha)
+        a2 = scalarToValue (sv2^.supvec.alpha)
 
-        b' = scalarToDbl b
+        b' = scalarToValue b
         y1' = classToDbl y1
         y2' = classToDbl y2
         e1 = calcClassError y1 t1
         e2 = calcClassError y2 t2
-        k11 = scalarToDbl $ k x1 x1
-        k12 = scalarToDbl $ k x1 x2
-        k22 = scalarToDbl $ k x2 x2
+        k11 = scalarToValue $ k x1 x1
+        k12 = scalarToValue $ k x1 x2
+        k22 = scalarToValue $ k x2 x2
 
         b1 = e1 + y1'*(a1new - a1)*k11
                 + y2'*(a2new - a2)*k12 + b'
@@ -455,9 +455,9 @@ etaOutOfBounds :: SVMParameters
 etaOutOfBounds params sv1 sv2 =
     let
        eps = params^.epsillon
-       alpha2 = scalarToDbl $ sv2^.supvec.alpha
-       h_obj = scalarToDbl $ psiUpper params sv1 sv2
-       l_obj = scalarToDbl $ psiLower params sv1 sv2
+       alpha2 = scalarToValue $ sv2^.supvec.alpha
+       h_obj = scalarToValue $ psiUpper params sv1 sv2
+       l_obj = scalarToValue $ psiLower params sv1 sv2
        l = l1 params sv1 sv2
        h = h1 params sv1 sv2
     in
@@ -478,12 +478,12 @@ determineAlpha2 params sv1 sv2 =
         eta = calcEta params sv1 sv2
         l =  l1 params sv1 sv2
         h =  h1 params sv1 sv2
-        alpha1 = scalarToDbl $ sv1^.supvec.alpha
-        alpha2 = scalarToDbl $ sv2^.supvec.alpha
+        alpha1 = scalarToValue $ sv1^.supvec.alpha
+        alpha2 = scalarToValue $ sv2^.supvec.alpha
         a2clip = alphaNewClipped a2' h l
         outOfBounds = etaOutOfBounds params sv1 sv2
-        a2' = scalarToDbl $ alpha2New eta sv1 sv2
-        a2 = if scalarToDbl (eta) > 0 then a2clip else outOfBounds
+        a2' = scalarToValue $ alpha2New eta sv1 sv2
+        a2 = if scalarToValue (eta) > 0 then a2clip else outOfBounds
     in
      do
        _ <- if (abs(a2-alpha2) < eps*(a2+alpha2+eps)) then Nothing else Just ()
