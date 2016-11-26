@@ -3,20 +3,20 @@
 
 module Numeric.Algorithms.HSVO.Detail where
 import Control.Lens
-import  Data.Array.Repa
+import  Data.Array.Repa (U, DIM1, computeS, computeP, foldS, foldP, foldAllS, fromListUnboxed, (-^), (*^), (+^), (!), (/^))
 import qualified Data.Array.Repa as R
 
 
-import Data.Array.Repa.Repr.Vector
+--import Data.Array.Repa.Repr.Vector
 import qualified Data.Vector as V
 
-import Data.Array.Repa.Repr.Vector                   as RV
-import Data.Array.Repa.Algorithms.Matrix
+--import Data.Array.Repa.Repr.Vector  as RV
+--import Data.Array.Repa.Algorithms.Matrix
 
 type Value = Double
 
-type BaseVector = Array U DIM1 Value
-type BaseScalar = Array U Z Value
+type BaseVector = R.Array U DIM1 Value
+type BaseScalar = R.Array U R.Z Value
 
 -- Making these types to attempt to make the system more type-safe
 newtype Sample = Sample BaseVector deriving (Show)
@@ -79,7 +79,7 @@ predictToTrue (PredictClass1 _) = Class1
 predictToTrue (PredictClass2 _) = Class2
 
 wrapScalar :: Value -> BaseScalar
-wrapScalar s = fromListUnboxed Z ([s] :: [Value])
+wrapScalar s = fromListUnboxed R.Z ([s] :: [Value])
 
 -- Building an SVM
 
@@ -100,7 +100,7 @@ svm params svl x =
                 b = params^.threshold
                 res = foldl (\a sv -> computeS (a +^ evaluateKernelWithWeight k sv x) ) (wrapScalar 0) svl -^ b
               in
-                chooseClass $ res ! Z
+                chooseClass $ res ! R.Z
 
 -- |equation 15, 2nd Derivative
 calcGrad :: Kernel -> Sample -> Sample -> BaseScalar
@@ -157,7 +157,7 @@ alphaNewClipped a h l
 
 
 scalarToDbl :: BaseScalar -> Value
-scalarToDbl s = s ! ( Z )
+scalarToDbl s = s ! ( R.Z )
 
 calcS :: ClassLabel -> ClassLabel -> Value
 calcS y1 y2 =
@@ -486,4 +486,3 @@ determineAlpha2 params sv1 sv2 =
      do
        _ <- if (abs(a2-alpha2) < eps*(a2+alpha2+eps)) then Nothing else Just ()
        Just (a2, a2clip)
-
