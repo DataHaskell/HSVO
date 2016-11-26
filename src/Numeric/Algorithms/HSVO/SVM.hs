@@ -7,6 +7,7 @@ module Numeric.Algorithms.HSVO.SVM where
 
 import Numeric.Algorithms.HSVO.Detail
 import Control.Lens
+import Data.Maybe (catMaybes)
 import qualified Data.Vector as V
 
 import Control.Monad.Reader --(MonadReader, Reader, ReaderT)
@@ -69,20 +70,13 @@ helper1 :: Maybe a -> [a] -> [a]
 helper1 (Just a) b = a : b
 helper1 Nothing b = b
 
-maybeToLists :: [Maybe a] -> [a]
-maybeToLists  =
-  foldr (helper1) []
-
-
-
 
 collateMaybes :: TrainingSupportVector -> [Maybe (TrainingSupportVector, TrainingSupportVector)] -> Maybe TrainingSupportVector
 collateMaybes tsv1 tsvList =
   let
-     validResults = WorkingState {_vectorList = snd <$> maybeToLists tsvList}
+     validResults = WorkingState {_vectorList = snd <$> catMaybes tsvList}
      alpha_data = foldrOf (vectorList . traverse . supvec . alpha) (\a (sum, count) -> ( (scalarToValue a) + sum, count+1)) (0, 0) validResults
-     sum =  fst alpha_data
-     len =  snd alpha_data
+     (sum, len) = alpha_data
      mean = sum / len
      tsv = firstOf (vectorList.traversed) validResults :: Maybe TrainingSupportVector
      makeNewTSV  = set (supvec . alpha) (wrapScalar mean) :: TrainingSupportVector -> TrainingSupportVector

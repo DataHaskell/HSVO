@@ -280,7 +280,7 @@ upperAlpha params sv1 sv2 =
         a2 = scalarToValue $ sv2^.supvec.alpha
         c = scalarToValue $ params^.margin
     in
-        if not (y1 == y2)
+        if y1 /= y2
         then
             min c (c + a1 - a2)
         else
