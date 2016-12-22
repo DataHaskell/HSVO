@@ -3,110 +3,25 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Numeric.Algorithms.HSVO.Detail where
+import Numeric.Algorithms.HSVO.Types
+
 import Control.Lens
-import  Data.Array.Repa (U, DIM1, computeS, computeP, foldS, foldP, foldAllS, fromListUnboxed, (-^), (*^), (+^), (!), (/^))
-import qualified Data.Array.Repa as R
-import Generics.Deriving
-
---import Data.Array.Repa.Repr.Vector
-import qualified Data.Vector as V
-
---import Data.Array.Repa.Repr.Vector  as RV
---import Data.Array.Repa.Algorithms.Matrix
-
-type Value = Double
-
-type BaseVector = R.Array U DIM1 Value
-type BaseScalar = R.Array U R.Z Value
-
--- Making these types to attempt to make the system more type-safe
-newtype Sample = Sample BaseVector deriving (Show)
-newtype Weights = Weights BaseVector deriving (Show)
-
-weightAsSample :: Weights -> Sample
-weightAsSample (Weights w) = Sample w
-
-type Threshold = BaseScalar
-
--- There is probably an opportunity to build a type-class around the
--- rules for composing kernel functions.
-type Kernel = Sample -> Sample -> BaseScalar
-
-data ClassLabel = Class1 | Class2 deriving (Show, Eq)
-
--- An SVM prediction also contains the "margin" that can be useful for solving
-data PredictedLabel = PredictClass1 Value | PredictClass2 Value deriving (Show, Eq)
-
-
-data SupportVector = SupportVector {
-                         _alpha :: BaseScalar
-                       , _vector :: Sample
-                       } deriving (Show, Generic)
-
-data TrainingSupportVector = TrainingSV {
-                             _trueLabel :: ClassLabel
-                           , _predLabel :: PredictedLabel
-                           , _classError :: Value
-                           , _supvec :: SupportVector
-                        } deriving (Show, Generic)
-
-data SVMParameters = SVMParameters {
-                        _kernel :: Kernel
-                     ,  _threshold :: Threshold
-                     ,  _margin :: BaseScalar     -- ^ parameter C in eq. 9
-                     ,  _epsillon :: Value        -- ^ rounding error for equality
-                    } deriving (Generic)
-
-data TrainingData = TrainingData {_training :: V.Vector TrainingSupportVector}
-                     deriving ( Generic)
-
-makeLenses ''SupportVector
-makeLenses ''TrainingSupportVector
-makeLenses ''SVMParameters
-makeLenses ''TrainingData
-
-getVec a = a^.(supvec . vector)
-getAlpha a = a^. (supvec . alpha)
-
-
-
--- PredictedLabel helpers
-
-getLabelValue :: PredictedLabel -> Value
-getLabelValue (PredictClass1 v) = v
-getLabelValue (PredictClass2 v) = v
-
-predictToTrue :: PredictedLabel -> ClassLabel
-predictToTrue (PredictClass1 _) = Class1
-predictToTrue (PredictClass2 _) = Class2
-
-wrapScalar :: Value -> BaseScalar
-wrapScalar s = fromListUnboxed R.Z ([s])
-
--- Building an SVM
-
-chooseClass :: Value -> PredictedLabel
-chooseClass res = if res >= 0 then PredictClass1 res else PredictClass2 res
-
-dot :: Kernel
-dot (Sample a) (Sample b) = foldS (+) 0 ( a *^ b)
-
 
 evaluateKernelWithWeight :: Kernel -> SupportVector -> Sample -> BaseScalar
-evaluateKernelWithWeight k sv x = computeS $ (sv^.alpha) *^ (sv^.vector) `k` x
+evaluateKernelWithWeight k sv x = (sv ^. alpha) * (sv ^. vector) `k` x
 
 svm :: SVMParameters -> [SupportVector] -> Sample -> PredictedLabel
 svm params svl x =
              let
                 k = params^.kernel
                 b = params^.threshold
-                res = foldl (\a sv -> computeS (a +^ evaluateKernelWithWeight k sv x) ) (wrapScalar 0) svl -^ b
+                res = (foldl (\a sv ->  (a + evaluateKernelWithWeight k sv x) )  0 svl ) - b
               in
-                chooseClass $ res ! R.Z
+                chooseClass res
 
 -- |equation 15, 2nd Derivative
 calcGrad :: Kernel -> Sample -> Sample -> BaseScalar
-calcGrad k x1 x2 =  computeS $ (x1 `k` x1) +^ (x2 `k` x2) -^ (wrapScalar 2 *^ (x1 `k` x2) )
+calcGrad k x1 x2 =  (x1 `k` x1) + (x2 `k` x2) - (2 * (x1 `k` x2) )
 
 calcEta :: SVMParameters -> TrainingSupportVector -> TrainingSupportVector -> BaseScalar
 calcEta params sv1 sv2 =
@@ -127,7 +42,7 @@ calcClassError trueLabel predLabel =
         predVal = getLabelValue predLabel
         classVal = classToDbl trueLabel
     in
-        --if trueLabel == predClass then 0 else predVal - classVal
+        --if rueLabel == predClass then 0 else predVal - classVal
         predVal - classVal
 
 
@@ -144,7 +59,7 @@ alpha2New e sv1 sv2 = -- a e y1 y2 s1 s2 =
         diff = wrapScalar $ e1 - e2
         a = sv2^.supvec.alpha
     in
-       computeS $ a  +^ y2 *^ diff /^ e -- Implementing eq 16
+       a  + y2 * diff / e -- Implementing eq 16
 
 
 -- | Equation 17,
@@ -159,7 +74,7 @@ alphaNewClipped a h l
 
 
 scalarToValue :: BaseScalar -> Value
-scalarToValue s = s ! ( R.Z )
+scalarToValue = id
 
 calcS :: ClassLabel -> ClassLabel -> Value
 calcS y1 y2 =
@@ -178,7 +93,7 @@ alpha1New sv1 sv2 a2 a2clip =
         s = wrapScalar $ calcS (sv1^.trueLabel) (sv2^.trueLabel)
         a = sv1^.supvec.alpha
     in
-        computeS $ a +^ s *^ (a2 -^ a2clip)
+        a + s * (a2 - a2clip)
 
 
 f1 :: SVMParameters  -- ^ SVM Parameters
@@ -201,7 +116,7 @@ f1 params sv1 sv2 =
         k12 = x1 `k` x2
         e1 = wrapScalar $ calcClassError (sv1^.trueLabel) (sv1^.predLabel)
     in
-        computeS $ y1'*^ (e1 +^ b) -^  a1 *^ k11 -^ s *^ a2 *^ k12
+        y1' * (e1 + b) -  a1 * k11 - s * a2 * k12
 
 
 f2 :: SVMParameters --
@@ -225,7 +140,7 @@ f2 params sv1 sv2 =
         k12 = x1 `k` x2
         e2 = wrapScalar $ calcClassError (sv2^.trueLabel) (sv2^.predLabel)
     in
-        computeS $ y2'*^(e2 +^ b) -^ s *^ a1 *^ k12 -^ a2 *^ k22
+        y2' * (e2 + b) - s * a1 * k12 - a2 * k22
 
 
 constructTrainingVec :: TrainingSupportVector
@@ -244,7 +159,6 @@ constructTrainingVec tsv label sv =
             , _supvec = sv
             , _classError = err
             }
-
 
 
 -- equation 13
@@ -342,11 +256,11 @@ psiLower params sv1 sv2 = --a1 a2 y1 y2 x1 x2 t1 t2 l =
         k22 = x2 `k` x2
         half = wrapScalar 0.5
     in
-       computeS $ l1'*^f1'
-           +^ l'*^f2'
-           +^ half*^l1'*^l1'*^k11
-           +^ half*^l1'*^l1'*^k22
-           +^ s*^l'*^l1'*^k12
+       l1'* f1'
+       + l'*f2'
+       + half*l1'*l1'*k11
+       + half*l1'*l1'*k22
+       + s*l'*l1'*k12
 
 psiUpper :: SVMParameters
             -> TrainingSupportVector -- Sample1
@@ -372,10 +286,10 @@ psiUpper params sv1 sv2=
         k22 = x2 `k` x2
         half = wrapScalar 0.5
     in
-        computeS $ h1'*^f1' +^ h'*^f2'
-                +^ half *^ h1' *^ h1' *^ k11
-                +^ half *^ h1' *^ h1' *^ k22
-                +^ s *^ h' *^ h1' *^ k12
+        h1'*f1' + h'*f2'
+                + half * h1' * h1' * k11
+                + half * h1' * h1' * k22
+                + s * h' * h1' * k12
 
 
 compareWithEps :: Value -> Value -> Value -> Bool
@@ -442,11 +356,11 @@ computeB params a1new a2new sv1 sv2 =
 
 elementDifference :: Sample -> Sample -> BaseVector
 elementDifference (Sample v1) (Sample v2) =
-    computeS $ (v1 -^ v2)
+    (v1 -^ v2)
 
 sumVector :: BaseVector -> Value
 sumVector v =
-    foldAllS (+) 0 v
+    foldl (+) 0 v
 
 etaOutOfBounds :: SVMParameters
                     -> TrainingSupportVector

@@ -6,6 +6,8 @@ module Numeric.Algorithms.HSVO.SVM where
 
 
 import Numeric.Algorithms.HSVO.Detail
+import Numeric.Algorithms.HSVO.Types
+
 import Control.Lens
 import Data.Maybe (catMaybes)
 import qualified Data.Vector as V
