@@ -14,7 +14,7 @@ import Control.Monad.Reader --(MonadReader, Reader, ReaderT)
 import Control.Monad.State --(MonadState, State, StateT)
 import Control.Monad.Writer
 
-import Control.Foldl
+--import Control.Foldl
 
 -- We need to be able to pass both the global parameters, but also some state parameters
 -- in the form of the vectors ....
@@ -60,12 +60,19 @@ Hmm... I guess I need to be careful with this design...
 -}
 
 
-takeStep :: SVMProblem ( TrainingSupportVector -> Maybe TrainingSupportVector )
+takeStepForEachOtherTSV :: SVMParameters -> WorkingState -> TrainingSupportVector -> Maybe TrainingSupportVector
+takeStepForEachOtherTSV params vecs x = collateMaybes x [takeStepDetail params v x | v <- (_vectorList vecs) ]
+
+
+takeStep :: SVMProblem ( )
 takeStep =
   do
     vecs <- get
     params <- ask
-    pure $ \x -> collateMaybes x [takeStepDetail params vec x  | vec <-  (_vectorList vecs ) ] -- list comprehension to evaluate over all maybes...
+    -- Use a prism to apply the result of collateMaybes every TSV.
+    -- TODO: Do the above
+    -- Work out how to get the search to be stochastic, or how to parallelise the work at this point.
+    pure ()
 
 helper1 :: Maybe a -> [a] -> [a]
 helper1 (Just a) b = a : b
@@ -86,7 +93,7 @@ collateMaybes tsv1 tsvList =
 
   in
     makeNewTSV <$> tsv
-   -- We need to use the foldMaybe thing, where it returns two sets of lits
+
 
 {-
 
@@ -143,31 +150,48 @@ http://stackoverflow.com/questions/28587132/making-read-only-functions-for-a-sta
 
 -}
 
+extractSupportVectors :: WorkingState -> [SupportVector]
+extractSupportVectors ws = ws ^.. vectorList . traversed . supvec
 
+{-
+
+More thoughts.... what if we do a zoom over a bunch of indicies...basically I want to
+describe a computation where we iterate over a set of tuples, but these tuples are zoomed
+in such that they carry the state information for a pair of vectors but everything else
+is read only....
+
+-}
 
 
 takeStepDetail :: SVMParameters
+            -> WorkingState
             -> TrainingSupportVector
             -> TrainingSupportVector
             -> Maybe (TrainingSupportVector, TrainingSupportVector)
-takeStepDetail params sv1 sv2 = Just (sv1, sv2)
-{-
+takeStepDetail params workState sv1 sv2 = --Just (sv1, sv2)
   let
         x1 = sv1^.supvec.vector
         x2 = sv2^.supvec.vector
         diff = sumVector (elementDifference x1 x2)
         identical = abs (diff) < params^.epsillon
-        sVectors = V.map (\a-> a^.supvec) tData
-    in
-
+        --sVectors = extractSupportVectors workState
+        --sVectors = V.map (\a-> a^.supvec) tData
+  in
         do
             -- First step, check that the vectors are identical.
             _ <- pure (if identical then Nothing else Just ())
             (a2, a2clip) <- determineAlpha2 params sv1 sv2
             a1 <- pure $ alpha1New sv1 sv2 (wrapScalar a2) (wrapScalar a2clip)
+            --
+            -- TODO: HELP!!! If I want to use this, I need to know which element index
+            -- I am at!!! This seems clunk, and also it would be nicer to just work with
+            -- it directly...
+            -- Is there a way I can re-design so that perhaps I'm just zooming in on the
+            -- part of the state that matterS!!!?!
             sv1' <- pure $ SupportVector {_alpha= a1, _vector=sv1^.supvec.vector}
             sv2' <- pure $ SupportVector {_alpha=wrapScalar (a2), _vector=sv2^.supvec.vector}
-            newSvec <- pure $ V.toList $ sVectors V.// [(i, sv1'), (j, sv2')]
+
+            --newSvec <- pure $ V.toList $ sVectors V.// [(i, sv1'), (j, sv2')]
             pred1 <- pure $ svm params newSvec x1
             pred2 <- pure $ svm params newSvec x2
             finalSv1 <- pure $ constructTrainingVec sv1 pred1 sv1'
@@ -176,7 +200,7 @@ takeStepDetail params sv1 sv2 = Just (sv1, sv2)
             -- Looks like I will need a complete SVM copy, and to make a
             -- new training set... can I build a traverse?
             return (finalSv1, finalSv2)-- modify existing training vector
--}
+
 
 {-
 trainToSv :: V.Vector TrainingSupportVector -> V.Vector Sample
