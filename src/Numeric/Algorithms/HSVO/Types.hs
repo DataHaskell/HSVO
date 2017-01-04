@@ -55,9 +55,11 @@ data TrainingSupportVector = TrainingSV {
 
 data SVMParameters = SVMParameters {
                         _kernel :: Kernel
+                     ,  _maxIters :: Int
                      ,  _threshold :: Threshold
                      ,  _margin :: BaseScalar     -- ^ parameter C in eq. 9
                      ,  _epsillon :: Value        -- ^ rounding error for equality
+                     ,  _supportVectors :: [SupportVector]
                     } deriving (Generic)
 
 data TrainingData = TrainingData {_training :: [TrainingSupportVector]}
