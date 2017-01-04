@@ -6,17 +6,15 @@ module Numeric.Algorithms.HSVO.Types where
 import Control.Lens
 import Generics.Deriving
 
-(-^) :: Num a => [a] -> [a] -> [a]
-(-^) = zipWith (-)
+{-
+
+-}
 
 (*^) :: Num a => [a] -> [a] -> [a]
 (*^) = zipWith (*)
 
-(+^) :: Num a => [a] -> [a] -> [a]
-(+^) = zipWith (+)
-
-(/^) :: Fractional a => [a] -> [a] -> [a]
-(/^) = zipWith (/)
+(-^) :: Num a => [a] -> [a] -> [a]
+(-^) = zipWith (-)
 
 
 type Value = Double
@@ -94,3 +92,29 @@ chooseClass res = if res >= 0 then PredictClass1 res else PredictClass2 res
 
 dot :: Kernel
 dot (Sample a) (Sample b) = foldl (+) 0 ( a *^ b)
+
+
+--import Control.Foldl
+
+-- We need to be able to pass both the global parameters, but also some state parameters
+-- in the form of the vectors ....
+
+
+
+-- | The main list of things...
+newtype WorkingState = WorkingState
+                     {
+                       _vectorList :: [TrainingSupportVector]
+                     }
+
+makeLenses ''WorkingState
+
+
+{-newtype SVMProblem a = SVMProblem {
+                         runProb :: StateT Int (WriterT String (Reader Int) ) a
+                         }
+                       deriving (MonadState Int , MonadWriter String, MonadReader Int)
+-}
+
+focusOnSupportVector :: WorkingState -> [SupportVector]
+focusOnSupportVector ws = ws ^.. vectorList . traversed . supvec

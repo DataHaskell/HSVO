@@ -1,4 +1,3 @@
-{- LANGUAGE XTypeOperators -}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -36,13 +35,11 @@ classToScalar a = wrapScalar $ classToDbl a
 
 
 calcClassError :: ClassLabel -> PredictedLabel -> Value
-calcClassError trueLabel predLabel =
+calcClassError tLabel pLabel =
     let
-        predClass = predictToTrue predLabel
-        predVal = getLabelValue predLabel
-        classVal = classToDbl trueLabel
+        predVal = getLabelValue pLabel
+        classVal = classToDbl tLabel
     in
-        --if rueLabel == predClass then 0 else predVal - classVal
         predVal - classVal
 
 
@@ -63,7 +60,7 @@ alpha2New e sv1 sv2 = -- a e y1 y2 s1 s2 =
 
 
 -- | Equation 17,
-alphaNewClipped :: (Num a, Ord a) => a -- ^ alpha2New
+alphaNewClipped :: Ord a => a -- ^ alpha2New
                    -> a                -- ^ H
                    -> a                -- ^ L
                    -> a
@@ -130,7 +127,6 @@ f2 params sv1 sv2 =
         a1 = sv1^.supvec.alpha
         a2 = sv2^.supvec.alpha
         y1 = sv1^.trueLabel
-        y1'= wrapScalar $ classToDbl y1
         y2 = sv2^.trueLabel
         y2'= wrapScalar $ classToDbl y2
         x1 = sv1^.supvec.vector
@@ -354,9 +350,11 @@ computeB params a1new a2new sv1 sv2 =
             (False, False) -> b1 -- (Note b1 should equal b2 in this instance?)
 
 
+
 elementDifference :: Sample -> Sample -> BaseVector
 elementDifference (Sample v1) (Sample v2) =
     (v1 -^ v2)
+
 
 sumVector :: BaseVector -> Value
 sumVector v =
