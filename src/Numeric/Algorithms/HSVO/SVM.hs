@@ -39,8 +39,13 @@ fitSVM initParams tsvList = do
                 Just params -> pure $ params ^. maxIters
   svmProblem <- pure $ constructProblem initParams tsvList
   result <- pure $ mainLoop =<< svmProblem
-  pure $ error "extract the SVMParameters out of the result"
-  Nothing
+  pure $ extractParams result
+
+
+{-| Extract the SVMParameters out of the transformer -}
+extractParams :: SVMProblem a -> SVMParameters
+extractParams = error "implement extractParams"
+
 
 {-| The actual main loop. Implemented as a recursive function. -}
 mainLoop :: Int -> SVMProblem Bool
@@ -53,13 +58,55 @@ mainLoop remainingIters
 {-| take a single step of the algorithm -}
 takeStep :: SVMProblem Bool
 takeStep = do
-  workState <- get
-  tsvList <- pure $  workState ^.. (vectorList)
-  pure $ error "try and work out how to decompose the next step.. we need to iterate over the list once!!"
+  --workState <- get
+  params <- ask
+  shuffleVectors
+  vectorList %= solvePairs params
+
+  error "determine convergence"
   return False
+
+
+{-| Shuffle vectors -}
+shuffleVectors :: SVMProblem ()
+shuffleVectors = error "Implemnet shuffleVectors"
+
+{-| Walk the list and then attempt to improve the SVM. Don't forget to shuffle the list! -}
+solvePairs :: SVMParameters -> [TrainingSupportVector] -> [TrainingSupportVector]
+solvePairs params (x:xs) = fst $ foldl (pairHelper params (x:xs)) ([], Just x) xs
+solvePairs params [] = []
+
+{-| Helper function for solvePairs, it will run over the pairs and determine appropriate output -}
+pairHelper :: SVMParameters -> [TrainingSupportVector]
+           -> ([TrainingSupportVector], Maybe TrainingSupportVector)
+           -> TrainingSupportVector
+           -> ([TrainingSupportVector], Maybe TrainingSupportVector)
+pairHelper _ _ (examined, Nothing) next =
+  (examined, Just next)
+pairHelper params allVecs (examined, Just target) next =
+  let
+    result = optimizePair params allVecs target next
+  in
+    case result of
+      Nothing -> ((next:examined), Just target)
+      Just (r1, r2) -> (r1: r2:examined, Nothing)
+
+
+{-| Now we have a pair of support vectors, lets optimise them. Note that the two that are selected
+will also be present in the allVecs list -}
+optimizePair :: SVMParameters
+             -> [TrainingSupportVector]
+             -> TrainingSupportVector
+             -> TrainingSupportVector
+             -> Maybe (TrainingSupportVector, TrainingSupportVector)
+optimizePair params allVecs t1 t2  = error "implement optimizePair"
+
 
 -- Note to self, we could use the lens "zoom" to implement the reduced set heuristic
 -- from the paper....
+-- Also, the order of the training examples is arbitrary... I just want to choose two
+-- and work with them, then choose a different two untill the list is exhausted...
+
 
 {-| Construct a SVM Problem monad -}
 constructProblem :: Maybe SVMParameters -> [TrainingSupportVector] -> SVMProblem a
