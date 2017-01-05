@@ -17,6 +17,9 @@ import Control.Monad.Writer
 
 type SVMProblem a = WriterT String (ReaderT SVMParameters (State WorkingState)) a
 
+runSVMProblem :: SVMProblem a  -> SVMParameters -> WorkingState -> ((a, String), WorkingState)
+runSVMProblem prob params state = runState ( runReaderT (runWriterT prob ) params) state
+
 type RawFeatures = [Double]
 
 {-
@@ -24,6 +27,8 @@ type RawFeatures = [Double]
 
 -}
 
+makeParams :: Maybe SVMParameters -> SVMParameters
+makeParams = error "implement makeParams"
 
 {-| HighLevel function to fit an SVM, takes in the training data and labels -}
 fitSVM' :: [RawFeatures] -> [ClassLabel] -> Maybe SVMParameters -> Maybe SVMParameters
@@ -37,14 +42,14 @@ fitSVM initParams tsvList = do
   maxRounds <- case initParams of
                 Nothing -> pure 100
                 Just params -> pure $ params ^. maxIters
-  svmProblem <- pure $ constructProblem initParams tsvList maxRounds
-  result <- pure $ mainLoop =<< svmProblem
-  pure $ extractParams result
+  result <- pure $ mainLoop maxRounds
+  newParams <- pure $ extractParams result
+  pure $ runSVMProblem newParams (makeParams initParams) (WorkingState tsvList) ^. _1 . _1
 
 
 {-| Extract the SVMParameters out of the transformer -}
-extractParams :: SVMProblem a -> SVMParameters
-extractParams = error "implement extractParams"
+extractParams :: SVMProblem a -> SVMProblem SVMParameters
+extractParams = error "implement extractParams" -- ... maybe this should be runState?
 
 
 {-| The actual main loop. Implemented as a recursive function. -}
