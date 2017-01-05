@@ -37,7 +37,7 @@ fitSVM initParams tsvList = do
   maxRounds <- case initParams of
                 Nothing -> pure 100
                 Just params -> pure $ params ^. maxIters
-  svmProblem <- pure $ constructProblem initParams tsvList
+  svmProblem <- pure $ constructProblem initParams tsvList maxRounds
   result <- pure $ mainLoop =<< svmProblem
   pure $ extractParams result
 
@@ -74,7 +74,7 @@ shuffleVectors = error "Implemnet shuffleVectors"
 {-| Walk the list and then attempt to improve the SVM. Don't forget to shuffle the list! -}
 solvePairs :: SVMParameters -> [TrainingSupportVector] -> [TrainingSupportVector]
 solvePairs params (x:xs) = fst $ foldl (pairHelper params (x:xs)) ([], Just x) xs
-solvePairs params [] = []
+solvePairs _ [] = []
 
 {-| Helper function for solvePairs, it will run over the pairs and determine appropriate output -}
 pairHelper :: SVMParameters -> [TrainingSupportVector]
@@ -109,7 +109,7 @@ optimizePair params allVecs t1 t2  = error "implement optimizePair"
 
 
 {-| Construct a SVM Problem monad -}
-constructProblem :: Maybe SVMParameters -> [TrainingSupportVector] -> SVMProblem a
+constructProblem :: Maybe SVMParameters -> [TrainingSupportVector] -> Int -> SVMProblem Int
 constructProblem = error "implement constructProblem"
 
 {-| Construct a list of supportVector objects from the raw data  -}
