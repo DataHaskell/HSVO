@@ -62,6 +62,8 @@ data SVMParameters = SVMParameters {
                      ,  _supportVectors :: [SupportVector]
                     } deriving (Generic)
 
+
+
 data TrainingData = TrainingData {_training :: [TrainingSupportVector]}
                      deriving ( Generic)
 
@@ -69,6 +71,8 @@ makeLenses ''SupportVector
 makeLenses ''TrainingSupportVector
 makeLenses ''SVMParameters
 makeLenses ''TrainingData
+
+
 
 getVec a = a^.(supvec . vector)
 getAlpha a = a^. (supvec . alpha)
@@ -112,6 +116,7 @@ newtype WorkingState = WorkingState
 makeLenses ''WorkingState
 
 
+
 {-newtype SVMProblem a = SVMProblem {
                          runProb :: StateT Int (WriterT String (Reader Int) ) a
                          }
@@ -120,3 +125,17 @@ makeLenses ''WorkingState
 
 focusOnSupportVector :: WorkingState -> [SupportVector]
 focusOnSupportVector ws = ws ^.. vectorList . traversed . supvec
+
+
+
+
+
+supvec1 = SupportVector 0.0 (Sample [0.2, 0.3])
+supvec2 = SupportVector 0.1 (Sample [0.2, 0.3])
+
+trainSV1 = TrainingSV Class1 (PredictClass1 0.1) 0 supvec1
+trainSV2 = TrainingSV Class2 (PredictClass2 0.3) 0 supvec2
+
+workState1 = WorkingState [trainSV1, trainSV2]
+
+testParams = SVMParameters dot 100 0.4 0.2 0.0001 []

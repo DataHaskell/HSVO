@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 module Numeric.Algorithms.HSVO.SVM where
 
 
@@ -22,10 +23,6 @@ runSVMProblem prob params state = runState ( runReaderT (runWriterT prob ) param
 
 type RawFeatures = [Double]
 
-{-
- Try again... lets just build the high level stuff....
-
--}
 
 makeParams :: Maybe SVMParameters -> SVMParameters
 makeParams = error "implement makeParams"
@@ -42,14 +39,62 @@ fitSVM initParams tsvList = do
   maxRounds <- case initParams of
                 Nothing -> pure 100
                 Just params -> pure $ params ^. maxIters
-  result <- pure $ mainLoop maxRounds
-  newParams <- pure $ extractParams result
-  pure $ runSVMProblem newParams (makeParams initParams) (WorkingState tsvList) ^. _1 . _1
+  newParams <- pure $ (extractParams . mainLoop) maxRounds
+  runSVMProblem newParams (makeParams initParams) (WorkingState tsvList) ^. _1 . _1
 
 
 {-| Extract the SVMParameters out of the transformer -}
-extractParams :: SVMProblem a -> SVMProblem SVMParameters
-extractParams = error "implement extractParams" -- ... maybe this should be runState?
+extractParams :: SVMProblem Bool -> SVMProblem (Maybe SVMParameters)
+extractParams m = do
+  test <- m
+  workState <- get
+  params <- ask
+  supVecs <- pure $ (filterSupVectors params) $ focusOnSupportVector workState
+  if not test
+    then pure Nothing
+    else pure $ Just params
+
+{-| Remove any support vectors whose weight is zero from the list -}
+filterSupVectors :: SVMParameters -> [SupportVector] -> [SupportVector]
+filterSupVectors params = filter (filterVec params)
+
+{-| Determine if a supVector should be filtered out -}
+filterVec :: SVMParameters -> SupportVector -> Bool
+filterVec params sv = if abs (sv ^. alpha) >= params ^. epsillon then True else False
+
+{- Wrapper on filterVec to take training support vectors -}
+
+filterTSV :: SVMParameters -> TrainingSupportVector -> Bool
+filterTSV params tsv = filterVec params $ tsv ^. supvec
+-- To create a law-abiding filter, lets apply the filter, remember the indecies, and then use the indecies to construct the lens. This way we filter what we want, but don't break any laws... although we suffer a penalty... an alternative would be to make this better by changing it
+
+
+{-| A function that takes a working state and produces a filtered lens.
+  -}
+--makeFilter :: SVMParameters -> WorkingState -> Optical' [TrainingSupportVector] (Indexed Int) f a a
+--IndexedFold Int WorkingState [TrainingSupportVector]
+
+helpLens
+  :: (Indexable Int p, Applicative f) =>
+     p SupportVector (f SupportVector) -> WorkingState -> f WorkingState
+helpLens = vectorList . traversed <. supvec
+
+
+{-makeFilter :: (Indexable Int p, Applicative f) =>
+     SVMParameters
+     -> WorkingState
+     -> p SupportVector (f SupportVector)
+     -> WorkingState
+     -> f WorkingState -}
+makeFilter :: SVMParameters -> WorkingState -> Traversal' WorkingState TrainingSupportVector
+makeFilter params ws =
+  let
+    indexedSupVec = vectorList . itraversed  --   :: (Indexable Int p, Applicative f) => p SupportVector (f SupportVector) -> WorkingState -> f WorkingState
+    targetIndicies = ifoldMapOf indexedSupVec
+      (\i a -> if filterTSV params a then [i] else []) ws
+    filt = ifiltered (\i _ -> i `elem` targetIndicies)
+  in
+    (vectorList . traversed ) . filt
 
 
 {-| The actual main loop. Implemented as a recursive function. -}
@@ -66,33 +111,45 @@ takeStep = do
   --workState <- get
   params <- ask
   shuffleVectors
-  vectorList %= solvePairs params
+  ws <- get
 
-  error "determine convergence"
-  return False
+  (newVector, result) <- pure $ solvePairs params $ filter (filterTSV params) $ ws ^. vectorList
+  vectorList .= newVector
+
+  if result
+    then pure result
+    else do
+      (newPairsComplete, completeResult) <- pure $ solvePairs params $ ws ^. vectorList
+      vectorList .= newVector
+      pure completeResult
 
 
 {-| Shuffle vectors -}
 shuffleVectors :: SVMProblem ()
 shuffleVectors = error "Implemnet shuffleVectors"
 
-{-| Walk the list and then attempt to improve the SVM. Don't forget to shuffle the list! -}
-solvePairs :: SVMParameters -> [TrainingSupportVector] -> [TrainingSupportVector]
-solvePairs params (x:xs) = fst $ foldl (pairHelper params  (x:xs) ) ([], Just x) xs
-solvePairs _ [] = []
 
-{-| Helper function for solvePairs, it will run over the pairs and determine appropriate output -}
+{-| Walk the list and then attempt to improve the SVM. Don't forget to shuffle the list! -}
+solvePairs :: SVMParameters -> [TrainingSupportVector] -> ([TrainingSupportVector], Bool)
+solvePairs params (x:xs) = let
+  (tsv, target, success) = foldl (pairHelper params  (x:xs) ) ([], Just x, False) xs
+  in
+    (tsv, success)
+solvePairs _ [] = ([], False)
+
+{-| Helper function for solvePairs, it will run over the pairs and determine appropriate output,
+ keeps a boolean to know if any of the pairs were successfully changed. -}
 pairHelper :: SVMParameters
            -> [TrainingSupportVector]
-           -> ([TrainingSupportVector], Maybe TrainingSupportVector)
+           -> ([TrainingSupportVector], Maybe TrainingSupportVector, Bool)
            -> TrainingSupportVector
-           -> ([TrainingSupportVector], Maybe TrainingSupportVector)
-pairHelper _ _ (examined, Nothing) next =
-  (examined, Just next)
-pairHelper params allVecs (examined, Just target) next =
+           -> ([TrainingSupportVector], Maybe TrainingSupportVector, Bool)
+pairHelper _ _ (examined, Nothing, success) next =
+  (examined, Just next, success)
+pairHelper params allVecs (examined, Just target, success) next =
     case takeStepDetail params (WorkingState allVecs) target next  of
-      Nothing -> ((next:examined), Just target)
-      Just (r1, r2) -> (r1: r2:examined, Nothing)
+      Nothing -> ((next:examined), Just target, success)
+      Just (r1, r2) -> (r1: r2:examined, Nothing, True)
 
 
 -- Note to self, we could use the lens "zoom" to implement the reduced set heuristic
