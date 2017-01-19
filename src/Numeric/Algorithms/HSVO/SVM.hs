@@ -23,9 +23,9 @@ runSVMProblem prob params state = runState ( runReaderT (runWriterT prob ) param
 
 type RawFeatures = [Double]
 
-
 makeParams :: Maybe SVMParameters -> SVMParameters
-makeParams = error "implement makeParams"
+makeParams (Just p) = p
+makeParams Nothing = testParams
 
 {-| HighLevel function to fit an SVM, takes in the training data and labels -}
 fitSVM' :: [RawFeatures] -> [ClassLabel] -> Maybe SVMParameters -> Maybe SVMParameters
@@ -105,6 +105,23 @@ mainLoop remainingIters
       converged <- takeStep
       if converged then return True else mainLoop (remainingIters - 1 )
 
+
+{-| Evaluate the SVM's current error -}
+evalSVM :: SVMProblem Double
+evalSVM = do
+  ws <- get
+  params <- ask
+  let
+    svList =  ws ^.. vectorList . traversed. supvec
+    samples = ws ^.. vectorList . traversed . supvec . vector
+    trueLabels = ws ^.. vectorList . traversed . trueLabel
+    f = svm params svList
+    predictedLabels = map f samples
+    truePredPairs = zip trueLabels predictedLabels
+    modelError = foldl (\b (t, p)  -> b + calcClassError t p ) 0.0 truePredPairs
+  pure modelError
+
+
 {-| take a single step of the algorithm -}
 takeStep :: SVMProblem Bool
 takeStep = do
@@ -112,17 +129,22 @@ takeStep = do
   params <- ask
   shuffleVectors
   ws <- get
+  trainError <- evalSVM
 
-  (newVector, result) <- pure $ solvePairs params $ filter (filterTSV params) $ ws ^. vectorList
+  (newVector, intResult) <- pure $ solvePairs params $ filter (filterTSV params) $ ws ^. vectorList
   vectorList .= newVector
 
-  if result
-    then pure result
-    else do
-      (newPairsComplete, completeResult) <- pure $ solvePairs params $ ws ^. vectorList
-      vectorList .= newVector
-      pure completeResult
+  result <-if intResult
+           then pure intResult
+           else do
+                 (newPairsComplete, completeResult) <- pure $ solvePairs params $ ws ^. vectorList
+                 vectorList .= newVector
+                 pure completeResult
 
+  newTrainError <- evalSVM
+
+  -- Consider converged if our the difference in our error is too small.
+  if abs (newTrainError - trainError) <= params ^. epsillon then pure False else pure result
 
 {-| Shuffle vectors -}
 shuffleVectors :: SVMProblem ()
@@ -132,7 +154,7 @@ shuffleVectors = error "Implemnet shuffleVectors"
 {-| Walk the list and then attempt to improve the SVM. Don't forget to shuffle the list! -}
 solvePairs :: SVMParameters -> [TrainingSupportVector] -> ([TrainingSupportVector], Bool)
 solvePairs params (x:xs) = let
-  (tsv, target, success) = foldl (pairHelper params  (x:xs) ) ([], Just x, False) xs
+  (tsv, _, success) = foldl (pairHelper params  (x:xs) ) ([], Just x, False) xs
   in
     (tsv, success)
 solvePairs _ [] = ([], False)
