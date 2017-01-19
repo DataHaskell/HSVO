@@ -188,18 +188,19 @@ pairHelper params allVecs (examined, Just target, success) next =
 -- and work with them, then choose a different two untill the list is exhausted...
 
 
-{-| Construct a SVM Problem monad -}
-constructProblem :: Maybe SVMParameters -> [TrainingSupportVector] -> Int -> SVMProblem Int
-constructProblem = error "implement constructProblem"
-
 {-| Construct a list of supportVector objects from the raw data  -}
 makeSupportVectors :: [RawFeatures] -> [ClassLabel] -> Maybe [TrainingSupportVector]
 makeSupportVectors = error "implement makeSupportVectors"
 
-{-| HighLevel function to predict data given an SVM -}
-predictSVM :: SVMParameters -> [RawFeatures] -> [ClassLabel]
-predictSVM params testData = error "implement predictSVM"
 
+{-| HighLevel function to predict data given an SVM -}
+predictSVM :: SVMParameters -> [RawFeatures] -> [PredictedLabel]
+predictSVM params testData =
+  let
+    svs = params ^. supportVectors
+    svm' = svm params svs
+  in
+    map svm' (map (\x -> x ^. vector) svs)
 
 
 -- Check to ensure that the Current vectors are not in the
