@@ -202,7 +202,6 @@ makeSupportVectors feat classes =
     else
       Nothing
 
-
 constructTSV :: Value
              -> PredictedLabel
              -> BaseScalar
@@ -226,12 +225,28 @@ predictSVM params testData =
 
 
 -- Check to ensure that the Current vectors are not in the
-inSet :: WorkingState -> TrainingSupportVector -> Bool
-inSet _ _ = error "Implement inSet"
+inSet :: WorkingState -> Double -> TrainingSupportVector -> Bool
+inSet ws eps tsv =
+  let
+    vList = ws ^.. vectorList . traversed . supvec . vector
+    samp = tsv ^. supvec . vector
+    diff = map (vDiff samp) vList
+    filt = filter (\a -> a < eps) diff
+  in
+    length filt < 1
 
-maybeInSet :: WorkingState -> TrainingSupportVector -> Maybe ()
-maybeInSet ws sv | (inSet ws sv) == True = Just ()
-maybeInSet _ _ = Nothing
+vDiff :: Sample -> Sample -> Double
+vDiff (Sample x1) (Sample x2) =
+  let
+    diff = map (\(a, b)-> abs (a-b)) $ zip x1 x2
+    sqr = map (\a -> a*a) diff
+  in
+    foldr (\a b -> a+b) 0 sqr
+
+
+maybeInSet :: Double ->  WorkingState -> TrainingSupportVector -> Maybe ()
+maybeInSet eps ws sv | (inSet ws eps sv) == True = Just ()
+maybeInSet _ _ _ = Nothing
 
 maybePass :: Bool -> Maybe ()
 maybePass True = Just ()
@@ -252,11 +267,12 @@ takeStepDetail params workState sv1 sv2 = --Just (sv1, sv2)
         x2 = sv2^.supvec.vector
         diff = sumVector (elementDifference x1 x2)
         identical = abs (diff) < params^.epsillon
+        eps = params ^. epsillon
 
   in
         do
-            maybeInSet workState sv1
-            maybeInSet workState sv2
+            maybeInSet eps workState sv1
+            maybeInSet eps workState sv2
             maybePass identical
 
             (a2, a2clip) <- determineAlpha2 params sv1 sv2
