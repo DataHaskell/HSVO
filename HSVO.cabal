@@ -25,7 +25,10 @@ library
                        repa-algorithms >= 3.4.0,
                        lens >= 4.13,
                        mtl >= 2.2.1,
-                       generic-deriving >= 1.1.1
+                       generic-deriving >= 1.1.1,
+                       MonadRandom >= 0.1.3,
+                       random >= 1.1,
+                       random-shuffle >= 0.0.4
   default-language:    Haskell2010
 
 

@@ -15,11 +15,14 @@ import qualified Data.Vector as V
 import Control.Monad.Reader --(MonadReader, Reader, ReaderT)
 import Control.Monad.State --(MonadState, State, StateT)
 import Control.Monad.Writer
+import Control.Monad.Random
+import System.Random
+import System.Random.Shuffle
 
-type SVMProblem a = WriterT String (ReaderT SVMParameters (State WorkingState)) a
+type SVMProblem a = WriterT String (ReaderT SVMParameters (StateT WorkingState (Rand StdGen))) a
 
-runSVMProblem :: SVMProblem a  -> SVMParameters -> WorkingState -> ((a, String), WorkingState)
-runSVMProblem prob params state = runState ( runReaderT (runWriterT prob ) params) state
+runSVMProblem :: SVMProblem a  -> SVMParameters -> WorkingState -> (((a, String), WorkingState), StdGen)
+runSVMProblem prob params state = runRand (runStateT ( runReaderT (runWriterT prob ) params) state) (mkStdGen 10)
 
 type RawFeatures = [Double]
 
@@ -40,7 +43,7 @@ fitSVM initParams tsvList = do
                 Nothing -> pure 100
                 Just params -> pure $ params ^. maxIters
   newParams <- pure $ (extractParams . mainLoop) maxRounds
-  runSVMProblem newParams (makeParams initParams) (WorkingState tsvList) ^. _1 . _1
+  runSVMProblem newParams (makeParams initParams) (WorkingState tsvList) ^. _1 ._1 . _1
 
 
 {-| Extract the SVMParameters out of the transformer -}
@@ -148,7 +151,12 @@ takeStep = do
 
 {-| Shuffle vectors -}
 shuffleVectors :: SVMProblem ()
-shuffleVectors = error "Implemnet shuffleVectors"
+shuffleVectors = do
+  ws <- get :: SVMProblem WorkingState
+  let
+    l = ws ^.. vectorList . traversed :: [TrainingSupportVector]
+  shuffled <- (shuffleM l) :: SVMProblem [TrainingSupportVector]
+  vectorList .= shuffled
 
 
 {-| Walk the list and then attempt to improve the SVM. Don't forget to shuffle the list! -}
