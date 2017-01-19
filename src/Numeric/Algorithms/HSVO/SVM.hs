@@ -189,8 +189,30 @@ pairHelper params allVecs (examined, Just target, success) next =
 
 
 {-| Construct a list of supportVector objects from the raw data  -}
+{-| Note this initialised the weights all to 1. Could consider using a random number gen. -}
 makeSupportVectors :: [RawFeatures] -> [ClassLabel] -> Maybe [TrainingSupportVector]
-makeSupportVectors = error "implement makeSupportVectors"
+makeSupportVectors feat classes =
+  let
+    defTSV = constructTSV 1 (PredictClass1 1) 1 :: Sample ->  ClassLabel -> TrainingSupportVector
+    inputs = zip (map (\x -> Sample x) feat) classes :: [(Sample, ClassLabel)]
+    tsvList = map (\(f, c) -> defTSV f c) inputs :: [TrainingSupportVector]
+  in
+    if (length feat) == (length classes) then
+      Just tsvList
+    else
+      Nothing
+
+
+constructTSV :: Value
+             -> PredictedLabel
+             -> BaseScalar
+             -> Sample
+             -> ClassLabel
+             -> TrainingSupportVector
+constructTSV defValue pLabel alpha x label =
+      TrainingSV {_trueLabel=label, _predLabel=pLabel,
+                  _classError=defValue,
+                  _supvec = SupportVector {_alpha=alpha, _vector=x}}
 
 
 {-| HighLevel function to predict data given an SVM -}
